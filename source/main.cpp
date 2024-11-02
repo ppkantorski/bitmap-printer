@@ -268,7 +268,7 @@ int main() {
                 // If button was not already held, start holding
                 held = true;
                 //capsscOpenRawScreenShotReadStream(nullptr, nullptr, nullptr, ViLayerStack_Default, 100'000'000);
-                initialOpen = true;
+                //initialOpen = true;
                 start_tick = armGetSystemTick();
             }
             else
