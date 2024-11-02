@@ -214,36 +214,104 @@ int main() {
     eventClear(&event);
 
     /* Loop forever. */
-    while (true) {
-        if (R_SUCCEEDED(eventWait(&event, 17'000'000))) {
+    //while (true) {
+    //    if (R_SUCCEEDED(eventWait(&event, 17'000'000))) {
+    //        eventClear(&event);
+    //        if (!held) {
+    //                            // If button was not already held, start holding
+    //            held = true;
+    //            start_tick = armGetSystemTick();
+    //            /* Capture screen in VI. */
+    //            if (R_SUCCEEDED(capsscOpenRawScreenShotReadStream(nullptr, nullptr, nullptr, ViLayerStack_Default, 100'000'000))) {
+    //                held       = true;
+    //                start_tick = armGetSystemTick();
+    //            }
+    //        } else if (start_tick != 0) {
+    //            /* Capture bitmap in file. */
+    //            Capture();
+    //            /* Discard capture. */
+    //            capsscCloseRawScreenShotReadStream();
+    //            start_tick = 0;
+    //            held       = false;
+    //        } else {
+    //            held = false;
+    //        }
+    //    } else {
+    //        if (start_tick != 0) {
+    //            /* If held for more than half a second we discard the capture. */
+    //            if (armTicksToNs(armGetSystemTick() - start_tick) > 500'000'000) {
+    //                capsscCloseRawScreenShotReadStream();
+    //                start_tick = 0;
+    //                held       = false;
+    //            }
+    //        }
+    //    }
+    //}
+
+    //bool initialOpen = false;
+
+    // Loop forever, waiting for capture button event.
+    while (true)
+    {
+        // Check for button press event
+        if (R_SUCCEEDED(eventWait(&event, 100000000))) // Wait for a short time to capture quick presses
+        {
             eventClear(&event);
-            if (!held) {
-                /* Capture screen in VI. */
-                if (R_SUCCEEDED(capsscOpenRawScreenShotReadStream(nullptr, nullptr, nullptr, ViLayerStack_Default, 100'000'000))) {
-                    held       = true;
-                    start_tick = armGetSystemTick();
-                }
-            } else if (start_tick != 0) {
-                /* Capture bitmap in file. */
-                Capture();
-                /* Discard capture. */
-                capsscCloseRawScreenShotReadStream();
-                start_tick = 0;
-                held       = false;
-            } else {
-                held = false;
+            //if (initialOpen) {
+            //    initialOpen = false;
+            //    capsscCloseRawScreenShotReadStream();
+            //    start_tick += armNsToTicks(50000000); // Convert 10 ms to ticks and add it to start_tick
+            //}
+
+            if (!held)
+            {
+                // If button was not already held, start holding
+                held = true;
+                //capsscOpenRawScreenShotReadStream(nullptr, nullptr, nullptr, ViLayerStack_Default, 100'000'000);
+                initialOpen = true;
+                start_tick = armGetSystemTick();
             }
-        } else {
-            if (start_tick != 0) {
-                /* If held for more than half a second we discard the capture. */
-                if (armTicksToNs(armGetSystemTick() - start_tick) > 500'000'000) {
+            else
+            {
+                // If button was already held and now released
+                u64 elapsed_ns = armTicksToNs(armGetSystemTick() - start_tick);
+    
+                if (elapsed_ns >= 50000000 && elapsed_ns < 500000000) // Between 50 ms and 500 ms
+                {
+                    /* Capture bitmap in file. */
+                    capsscOpenRawScreenShotReadStream(nullptr, nullptr, nullptr, ViLayerStack_Default, 100'000'000);
+                    Capture();
                     capsscCloseRawScreenShotReadStream();
-                    start_tick = 0;
-                    held       = false;
                 }
+                
+
+                // Reset the state
+                held = false;
+                start_tick = 0;
+                
+
+            }
+        }
+        else if (held)
+        {
+
+            // If the button was held for more than 500 ms, reset
+            u64 elapsed_ns = armTicksToNs(armGetSystemTick() - start_tick);
+            
+            if (elapsed_ns >= 500000000) // More than 500 ms
+            {
+                //if (initialOpen) {
+                //    initialOpen = false;
+                //    capsscCloseRawScreenShotReadStream();
+                //}
+                //capsscCloseRawScreenShotReadStream();
+                // Long press detected, ignore as a quick press
+                held = false;
+                start_tick = 0;
             }
         }
     }
+
 
     /* Unreachable lol */
 }
