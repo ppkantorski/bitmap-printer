@@ -132,13 +132,12 @@ char b_path_buffer[FS_MAX_PATH];
 
 #if NO_JPG_DIRECTIVE
 
-// Function to find and delete the newest .jpg in the Album directory
-void deleteNewestJpg(FsFileSystem *albumDirectory)
-{
+// Function to find and delete the closest .jpg to the specified reference timestamp in the Album directory
+void deleteClosestToCurrentTimeJpg(FsFileSystem *albumDirectory, u64 referenceTimestamp) {
     FsDir rootDir;
     FsDirectoryEntry rootEntry;
-    char latestFilePath[MAX_PATH_BUFFER] = {0};
-    u64 latestTimestamp = 0;
+    char closestFilePath[FS_MAX_PATH] = {0};
+    u64 smallestTimeDelta = (u64)(-1);  // Initialize to max possible value
 
     // Open the Album directory
     if (R_FAILED(fsFsOpenDirectory(albumDirectory, "/", FsDirOpenMode_ReadDirs, &rootDir))) {
@@ -146,13 +145,11 @@ void deleteNewestJpg(FsFileSystem *albumDirectory)
     }
 
     s64 entriesRead = 0;
-    // Traverse the Album folder structure
     while (R_SUCCEEDED(fsDirRead(&rootDir, &entriesRead, 1, &rootEntry)) && entriesRead > 0) {
         if (rootEntry.type != FsDirEntryType_Dir) continue;
 
-        char yearFolder[MAX_PATH_BUFFER];
-        std::strncpy(yearFolder, "/", sizeof(yearFolder) - 1);
-        std::strncat(yearFolder, rootEntry.name, sizeof(yearFolder) - std::strlen(yearFolder) - 1);
+        char yearFolder[FS_MAX_PATH] = "/";
+        std::strncat(yearFolder, rootEntry.name, FS_MAX_PATH - std::strlen(yearFolder) - 1);
 
         FsDir yearDir;
         if (R_FAILED(fsFsOpenDirectory(albumDirectory, yearFolder, FsDirOpenMode_ReadDirs, &yearDir))) continue;
@@ -162,10 +159,10 @@ void deleteNewestJpg(FsFileSystem *albumDirectory)
         while (R_SUCCEEDED(fsDirRead(&yearDir, &monthEntriesRead, 1, &monthEntry)) && monthEntriesRead > 0) {
             if (monthEntry.type != FsDirEntryType_Dir) continue;
 
-            char monthFolder[MAX_PATH_BUFFER];
-            std::strncpy(monthFolder, yearFolder, sizeof(monthFolder) - 1);
-            std::strncat(monthFolder, "/", sizeof(monthFolder) - std::strlen(monthFolder) - 1);
-            std::strncat(monthFolder, monthEntry.name, sizeof(monthFolder) - std::strlen(monthFolder) - 1);
+            char monthFolder[FS_MAX_PATH];
+            std::strncpy(monthFolder, yearFolder, FS_MAX_PATH - 1);
+            std::strncat(monthFolder, "/", FS_MAX_PATH - std::strlen(monthFolder) - 1);
+            std::strncat(monthFolder, monthEntry.name, FS_MAX_PATH - std::strlen(monthFolder) - 1);
 
             FsDir monthDir;
             if (R_FAILED(fsFsOpenDirectory(albumDirectory, monthFolder, FsDirOpenMode_ReadDirs, &monthDir))) continue;
@@ -175,10 +172,10 @@ void deleteNewestJpg(FsFileSystem *albumDirectory)
             while (R_SUCCEEDED(fsDirRead(&monthDir, &dayEntriesRead, 1, &dayEntry)) && dayEntriesRead > 0) {
                 if (dayEntry.type != FsDirEntryType_Dir) continue;
 
-                char dayFolder[MAX_PATH_BUFFER];
-                std::strncpy(dayFolder, monthFolder, sizeof(dayFolder) - 1);
-                std::strncat(dayFolder, "/", sizeof(dayFolder) - std::strlen(dayFolder) - 1);
-                std::strncat(dayFolder, dayEntry.name, sizeof(dayFolder) - std::strlen(dayFolder) - 1);
+                char dayFolder[FS_MAX_PATH];
+                std::strncpy(dayFolder, monthFolder, FS_MAX_PATH - 1);
+                std::strncat(dayFolder, "/", FS_MAX_PATH - std::strlen(dayFolder) - 1);
+                std::strncat(dayFolder, dayEntry.name, FS_MAX_PATH - std::strlen(dayFolder) - 1);
 
                 FsDir dayDir;
                 if (R_FAILED(fsFsOpenDirectory(albumDirectory, dayFolder, FsDirOpenMode_ReadFiles, &dayDir))) continue;
@@ -193,23 +190,22 @@ void deleteNewestJpg(FsFileSystem *albumDirectory)
                     if (len < 4 || std::strcmp(&fileEntry.name[len - 4], ".jpg") != 0) continue;
 
                     // Parse timestamp from filename
-                    u64 timestamp = 0;
+                    u64 fileTimestamp = 0;
                     for (int i = 0; i < 14 && std::isdigit(static_cast<unsigned char>(fileEntry.name[i])); ++i) {
-                        timestamp = timestamp * 10 + (fileEntry.name[i] - '0');
+                        fileTimestamp = fileTimestamp * 10 + (fileEntry.name[i] - '0');
                     }
 
-                    // Update if this file has a newer timestamp
-                    if (timestamp > latestTimestamp) {
-                        latestTimestamp = timestamp;
+                    // Calculate the time difference from the reference timestamp
+                    u64 timeDelta = (fileTimestamp > referenceTimestamp) ? 
+                                    (fileTimestamp - referenceTimestamp) : 
+                                    (referenceTimestamp - fileTimestamp);
 
-                        // Construct the path with buffer-safe concatenation
-                        std::strncpy(latestFilePath, dayFolder, sizeof(latestFilePath) - 1);
-                        size_t remainingSpace = sizeof(latestFilePath) - std::strlen(latestFilePath) - 1;
-                        if (remainingSpace > 0) {
-                            std::strncat(latestFilePath, "/", remainingSpace);
-                            remainingSpace = sizeof(latestFilePath) - std::strlen(latestFilePath) - 1;
-                            std::strncat(latestFilePath, fileEntry.name, remainingSpace);
-                        }
+                    // Update if this .jpg file is the closest to the reference timestamp
+                    if (timeDelta < smallestTimeDelta) {
+                        smallestTimeDelta = timeDelta;
+                        std::strncpy(closestFilePath, dayFolder, FS_MAX_PATH - 1);
+                        std::strncat(closestFilePath, "/", FS_MAX_PATH - std::strlen(closestFilePath) - 1);
+                        std::strncat(closestFilePath, fileEntry.name, FS_MAX_PATH - std::strlen(closestFilePath) - 1);
                     }
                 }
                 fsDirClose(&dayDir);
@@ -220,11 +216,13 @@ void deleteNewestJpg(FsFileSystem *albumDirectory)
     }
     fsDirClose(&rootDir);
 
-    // Delete the latest file if found
-    if (latestTimestamp != 0) {
-        fsFsDeleteFile(albumDirectory, latestFilePath);
+    // Delete the closest file if found
+    if (smallestTimeDelta != (u64)(-1)) {
+        fsFsDeleteFile(albumDirectory, closestFilePath);
     }
 }
+
+
 #endif
 
 
@@ -285,26 +283,37 @@ Result Capture() {
     rm_guard.Cancel();
     file_guard.Invoke();
 
-    /* I don't care if any of this fails. */
+    /* Get timestamp for the temporary file */
     FsTimeStampRaw timestamp;
+    u64 referenceTimestamp = 0;
     if (R_SUCCEEDED(fsFsGetFileTimeStampRaw(&fs, path_buffer, &timestamp))) {
         time_t ts = timestamp.created;
-        tm _t;
-        tm *t = gmtime_r(&ts, &_t);
+        struct tm _t;
+        struct tm *t = gmtime_r(&ts, &_t);
+
+        // Generate reference timestamp in yyyymmddhhmmss format
+        referenceTimestamp = (t->tm_year + 1900) * 10000000000ULL +
+                             (t->tm_mon + 1) * 100000000 +
+                             t->tm_mday * 1000000 +
+                             t->tm_hour * 10000 +
+                             t->tm_min * 100 +
+                             t->tm_sec;
+
+        // Rename the temp file to include this timestamp
         s_printf(b_path_buffer, "/Bitmaps/%d-%02d-%02d_%02d-%02d-%02d.bmp",
-                      t->tm_year + 1900,
-                      t->tm_mon + 1,
-                      t->tm_mday,
-                      t->tm_hour,
-                      t->tm_min,
-                      t->tm_sec);
+                 t->tm_year + 1900,
+                 t->tm_mon + 1,
+                 t->tm_mday,
+                 t->tm_hour,
+                 t->tm_min,
+                 t->tm_sec);
         fsFsRenameFile(&fs, path_buffer, b_path_buffer);
     }
 
     #if NO_JPG_DIRECTIVE
-    deleteNewestJpg(&fs);
+    deleteClosestToCurrentTimeJpg(&fs, referenceTimestamp);
     #endif
-
+    
     return 0;
 }
 
