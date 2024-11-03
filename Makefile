@@ -31,10 +31,15 @@ SOURCES		:=	source
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 
-CFLAGS	:=	-g -Wall -Wextra -Wpedantic -Werror -O2 -ffunction-sections \
-			$(ARCH) $(DEFINES)
+CFLAGS	:=	-g -Wall -Wextra -Wpedantic -Werror -Os -ffunction-sections \
+			$(ARCH) $(DEFINES) -Wno-pedantic -Wno-missing-field-initializers
 
 CFLAGS	+=	$(INCLUDE) -D__SWITCH__
+
+# For no jpg duplicates (optional)
+NO_JPG_DIRECTIVE := 1
+CFLAGS += -DNO_JPG_DIRECTIVE=$(NO_JPG_DIRECTIVE)
+
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=c++20
 
