@@ -1,5 +1,6 @@
 #include <cstring>
 #include <ctime>
+#include <cctype>
 #include <switch.h>
 #include "scope_guard.hpp"
 #include "internal.h"
@@ -127,6 +128,106 @@ char b_path_buffer[FS_MAX_PATH];
             return res;        \
     })
 
+#define MAX_PATH_BUFFER 769
+
+#if NO_JPG_DIRECTIVE
+
+// Function to find and delete the newest .jpg in the Album directory
+void deleteNewestJpg(FsFileSystem *albumDirectory)
+{
+    FsDir rootDir;
+    FsDirectoryEntry rootEntry;
+    char latestFilePath[MAX_PATH_BUFFER] = {0};
+    u64 latestTimestamp = 0;
+
+    // Open the Album directory
+    if (R_FAILED(fsFsOpenDirectory(albumDirectory, "/", FsDirOpenMode_ReadDirs, &rootDir))) {
+        return;
+    }
+
+    s64 entriesRead = 0;
+    // Traverse the Album folder structure
+    while (R_SUCCEEDED(fsDirRead(&rootDir, &entriesRead, 1, &rootEntry)) && entriesRead > 0) {
+        if (rootEntry.type != FsDirEntryType_Dir) continue;
+
+        char yearFolder[MAX_PATH_BUFFER];
+        std::strncpy(yearFolder, "/", sizeof(yearFolder) - 1);
+        std::strncat(yearFolder, rootEntry.name, sizeof(yearFolder) - std::strlen(yearFolder) - 1);
+
+        FsDir yearDir;
+        if (R_FAILED(fsFsOpenDirectory(albumDirectory, yearFolder, FsDirOpenMode_ReadDirs, &yearDir))) continue;
+
+        FsDirectoryEntry monthEntry;
+        s64 monthEntriesRead = 0;
+        while (R_SUCCEEDED(fsDirRead(&yearDir, &monthEntriesRead, 1, &monthEntry)) && monthEntriesRead > 0) {
+            if (monthEntry.type != FsDirEntryType_Dir) continue;
+
+            char monthFolder[MAX_PATH_BUFFER];
+            std::strncpy(monthFolder, yearFolder, sizeof(monthFolder) - 1);
+            std::strncat(monthFolder, "/", sizeof(monthFolder) - std::strlen(monthFolder) - 1);
+            std::strncat(monthFolder, monthEntry.name, sizeof(monthFolder) - std::strlen(monthFolder) - 1);
+
+            FsDir monthDir;
+            if (R_FAILED(fsFsOpenDirectory(albumDirectory, monthFolder, FsDirOpenMode_ReadDirs, &monthDir))) continue;
+
+            FsDirectoryEntry dayEntry;
+            s64 dayEntriesRead = 0;
+            while (R_SUCCEEDED(fsDirRead(&monthDir, &dayEntriesRead, 1, &dayEntry)) && dayEntriesRead > 0) {
+                if (dayEntry.type != FsDirEntryType_Dir) continue;
+
+                char dayFolder[MAX_PATH_BUFFER];
+                std::strncpy(dayFolder, monthFolder, sizeof(dayFolder) - 1);
+                std::strncat(dayFolder, "/", sizeof(dayFolder) - std::strlen(dayFolder) - 1);
+                std::strncat(dayFolder, dayEntry.name, sizeof(dayFolder) - std::strlen(dayFolder) - 1);
+
+                FsDir dayDir;
+                if (R_FAILED(fsFsOpenDirectory(albumDirectory, dayFolder, FsDirOpenMode_ReadFiles, &dayDir))) continue;
+
+                FsDirectoryEntry fileEntry;
+                s64 fileEntriesRead = 0;
+                while (R_SUCCEEDED(fsDirRead(&dayDir, &fileEntriesRead, 1, &fileEntry)) && fileEntriesRead > 0) {
+                    if (fileEntry.type != FsDirEntryType_File) continue;
+
+                    // Check for ".jpg" extension
+                    size_t len = std::strlen(fileEntry.name);
+                    if (len < 4 || std::strcmp(&fileEntry.name[len - 4], ".jpg") != 0) continue;
+
+                    // Parse timestamp from filename
+                    u64 timestamp = 0;
+                    for (int i = 0; i < 14 && std::isdigit(static_cast<unsigned char>(fileEntry.name[i])); ++i) {
+                        timestamp = timestamp * 10 + (fileEntry.name[i] - '0');
+                    }
+
+                    // Update if this file has a newer timestamp
+                    if (timestamp > latestTimestamp) {
+                        latestTimestamp = timestamp;
+
+                        // Construct the path with buffer-safe concatenation
+                        std::strncpy(latestFilePath, dayFolder, sizeof(latestFilePath) - 1);
+                        size_t remainingSpace = sizeof(latestFilePath) - std::strlen(latestFilePath) - 1;
+                        if (remainingSpace > 0) {
+                            std::strncat(latestFilePath, "/", remainingSpace);
+                            remainingSpace = sizeof(latestFilePath) - std::strlen(latestFilePath) - 1;
+                            std::strncat(latestFilePath, fileEntry.name, remainingSpace);
+                        }
+                    }
+                }
+                fsDirClose(&dayDir);
+            }
+            fsDirClose(&monthDir);
+        }
+        fsDirClose(&yearDir);
+    }
+    fsDirClose(&rootDir);
+
+    // Delete the latest file if found
+    if (latestTimestamp != 0) {
+        fsFsDeleteFile(albumDirectory, latestFilePath);
+    }
+}
+#endif
+
+
 Result Capture() {
     /* Get filesystem handle. */
     FsFileSystem fs;
@@ -199,6 +300,10 @@ Result Capture() {
                       t->tm_sec);
         fsFsRenameFile(&fs, path_buffer, b_path_buffer);
     }
+
+    #if NO_JPG_DIRECTIVE
+    deleteNewestJpg(&fs);
+    #endif
 
     return 0;
 }
