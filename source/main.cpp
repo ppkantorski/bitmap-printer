@@ -368,7 +368,7 @@ int main() {
     while (true)
     {
         // Check for button press event
-        if (R_SUCCEEDED(eventWait(&event, 100000000))) // Wait for a short time to capture quick presses
+        if (R_SUCCEEDED(eventWait(&captureButtonEvent, 3600000000000))) // increased to 1 hour (longer the better here)
         {
             eventClear(&event);
             //if (initialOpen) {
