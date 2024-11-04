@@ -327,8 +327,8 @@ int main() {
     R_ABORT_UNLESS(hidsysAcquireCaptureButtonEventHandle(&event, false));
     eventClear(&event);
 
-    const u64 upperThresheld = 500000000;
-    const u64 lowerThresheld = 50000000;
+    const u64 upperThreshold = 500000000;
+    const u64 lowerThreshold = 50000000;
 
     // Loop forever, waiting for capture button event.
     while (true)
@@ -341,7 +341,7 @@ int main() {
             // If the button was held for more than 500 ms, reset
             u64 elapsed_ns = armTicksToNs(armGetSystemTick() - start_tick);
             
-            if (elapsed_ns >= upperThresheld || !held) // More than 500 ms
+            if (elapsed_ns >= upperThreshold || !held) // More than 500 ms
             {
                 // If button was not already held, start holding
                 held = true;
@@ -352,7 +352,7 @@ int main() {
                 // If button was already held and now released
                 //u64 elapsed_ns = armTicksToNs(armGetSystemTick() - start_tick);
     
-                if (elapsed_ns >= lowerThresheld && elapsed_ns < upperThresheld) // Between 50 ms and 500 ms
+                if (elapsed_ns >= lowerThreshold && elapsed_ns < upperThreshold) // Between 50 ms and 500 ms
                 {
                     /* Capture bitmap in file. */
                     capsscOpenRawScreenShotReadStream(nullptr, nullptr, nullptr, ViLayerStack_Default, 100'000'000);
