@@ -331,7 +331,7 @@ int main() {
     while (true)
     {
         // Check for button press event
-        if (R_SUCCEEDED(eventWait(&event, 20'000'000)))
+        if (R_SUCCEEDED(eventWait(&event, UINT64_MAX))) // await indefinetly
         {
             eventClear(&event);
 
@@ -362,18 +362,18 @@ int main() {
 
             }
         }
-        else if (held)
-        {
-            // If the button was held for more than 500 ms, reset
-            u64 elapsed_ns = armTicksToNs(armGetSystemTick() - start_tick);
-            
-            if (elapsed_ns >= 500000000) // More than 500 ms
-            {
-                // Long press detected, ignore as a quick press
-                held = false;
-                start_tick = 0;
-            }
-        }
+        //else if (held)
+        //{
+        //    // If the button was held for more than 500 ms, reset
+        //    u64 elapsed_ns = armTicksToNs(armGetSystemTick() - start_tick);
+        //    
+        //    if (elapsed_ns >= 500000000) // More than 500 ms
+        //    {
+        //        // Long press detected, ignore as a quick press
+        //        held = false;
+        //        start_tick = 0;
+        //    }
+        //}
     }
 
 
