@@ -331,7 +331,7 @@ int main() {
     while (true)
     {
         // Check for button press event
-        if (R_SUCCEEDED(eventWait(&event, UINT64_MAX))) // increased to 1 hour (longer the better here)
+        if (R_SUCCEEDED(eventWait(&event, 20'000'000)))
         {
             eventClear(&event);
 
