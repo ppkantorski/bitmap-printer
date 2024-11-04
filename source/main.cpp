@@ -313,7 +313,7 @@ Result Capture() {
     #if NO_JPG_DIRECTIVE
     deleteClosestToCurrentTimeJpg(&fs, referenceTimestamp);
     #endif
-    
+
     return 0;
 }
 
@@ -327,62 +327,18 @@ int main() {
     R_ABORT_UNLESS(hidsysAcquireCaptureButtonEventHandle(&event, false));
     eventClear(&event);
 
-    /* Loop forever. */
-    //while (true) {
-    //    if (R_SUCCEEDED(eventWait(&event, 17'000'000))) {
-    //        eventClear(&event);
-    //        if (!held) {
-    //                            // If button was not already held, start holding
-    //            held = true;
-    //            start_tick = armGetSystemTick();
-    //            /* Capture screen in VI. */
-    //            if (R_SUCCEEDED(capsscOpenRawScreenShotReadStream(nullptr, nullptr, nullptr, ViLayerStack_Default, 100'000'000))) {
-    //                held       = true;
-    //                start_tick = armGetSystemTick();
-    //            }
-    //        } else if (start_tick != 0) {
-    //            /* Capture bitmap in file. */
-    //            Capture();
-    //            /* Discard capture. */
-    //            capsscCloseRawScreenShotReadStream();
-    //            start_tick = 0;
-    //            held       = false;
-    //        } else {
-    //            held = false;
-    //        }
-    //    } else {
-    //        if (start_tick != 0) {
-    //            /* If held for more than half a second we discard the capture. */
-    //            if (armTicksToNs(armGetSystemTick() - start_tick) > 500'000'000) {
-    //                capsscCloseRawScreenShotReadStream();
-    //                start_tick = 0;
-    //                held       = false;
-    //            }
-    //        }
-    //    }
-    //}
-
-    //bool initialOpen = false;
-
     // Loop forever, waiting for capture button event.
     while (true)
     {
         // Check for button press event
-        if (R_SUCCEEDED(eventWait(&event, UINT64_MAX))) // await indefinetly
+        if (R_SUCCEEDED(eventWait(&event, UINT64_MAX))) // increased to 1 hour (longer the better here)
         {
             eventClear(&event);
-            //if (initialOpen) {
-            //    initialOpen = false;
-            //    capsscCloseRawScreenShotReadStream();
-            //    start_tick += armNsToTicks(50000000); // Convert 10 ms to ticks and add it to start_tick
-            //}
 
             if (!held)
             {
                 // If button was not already held, start holding
                 held = true;
-                //capsscOpenRawScreenShotReadStream(nullptr, nullptr, nullptr, ViLayerStack_Default, 100'000'000);
-                //initialOpen = true;
                 start_tick = armGetSystemTick();
             }
             else
@@ -408,17 +364,11 @@ int main() {
         }
         else if (held)
         {
-
             // If the button was held for more than 500 ms, reset
             u64 elapsed_ns = armTicksToNs(armGetSystemTick() - start_tick);
             
             if (elapsed_ns >= 500000000) // More than 500 ms
             {
-                //if (initialOpen) {
-                //    initialOpen = false;
-                //    capsscCloseRawScreenShotReadStream();
-                //}
-                //capsscCloseRawScreenShotReadStream();
                 // Long press detected, ignore as a quick press
                 held = false;
                 start_tick = 0;
