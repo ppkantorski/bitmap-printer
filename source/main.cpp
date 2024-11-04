@@ -368,7 +368,7 @@ int main() {
     while (true)
     {
         // Check for button press event
-        if (R_SUCCEEDED(eventWait(&captureButtonEvent, UINT64_MAX))) // await indefinetly
+        if (R_SUCCEEDED(eventWait(&event, UINT64_MAX))) // await indefinetly
         {
             eventClear(&event);
             //if (initialOpen) {
