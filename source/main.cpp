@@ -327,6 +327,9 @@ int main() {
     R_ABORT_UNLESS(hidsysAcquireCaptureButtonEventHandle(&event, false));
     eventClear(&event);
 
+    const u64 upperThresheld = 500000000;
+    const u64 lowerThresheld = 50000000;
+
     // Loop forever, waiting for capture button event.
     while (true)
     {
@@ -335,7 +338,10 @@ int main() {
         {
             eventClear(&event);
 
-            if (!held)
+            // If the button was held for more than 500 ms, reset
+            u64 elapsed_ns = armTicksToNs(armGetSystemTick() - start_tick);
+            
+            if (elapsed_ns >= upperThresheld || !held) // More than 500 ms
             {
                 // If button was not already held, start holding
                 held = true;
@@ -344,9 +350,9 @@ int main() {
             else
             {
                 // If button was already held and now released
-                u64 elapsed_ns = armTicksToNs(armGetSystemTick() - start_tick);
+                //u64 elapsed_ns = armTicksToNs(armGetSystemTick() - start_tick);
     
-                if (elapsed_ns >= 50000000 && elapsed_ns < 500000000) // Between 50 ms and 500 ms
+                if (elapsed_ns >= lowerThresheld && elapsed_ns < upperThresheld) // Between 50 ms and 500 ms
                 {
                     /* Capture bitmap in file. */
                     capsscOpenRawScreenShotReadStream(nullptr, nullptr, nullptr, ViLayerStack_Default, 100'000'000);
@@ -362,18 +368,6 @@ int main() {
 
             }
         }
-        //else if (held)
-        //{
-        //    // If the button was held for more than 500 ms, reset
-        //    u64 elapsed_ns = armTicksToNs(armGetSystemTick() - start_tick);
-        //    
-        //    if (elapsed_ns >= 500000000) // More than 500 ms
-        //    {
-        //        // Long press detected, ignore as a quick press
-        //        held = false;
-        //        start_tick = 0;
-        //    }
-        //}
     }
 
 
