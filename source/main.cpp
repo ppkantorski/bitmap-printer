@@ -355,7 +355,7 @@ int main() {
                 if (elapsed_ns >= lowerThreshold && elapsed_ns < upperThreshold) // Between 50 ms and 500 ms
                 {
                     /* Capture bitmap in file. */
-                    capsscOpenRawScreenShotReadStream(nullptr, nullptr, nullptr, ViLayerStack_Default, 100'000'000);
+                    capsscOpenRawScreenShotReadStream(nullptr, nullptr, nullptr, ViLayerStack_Screenshot, 100'000'000);
                     Capture();
                     capsscCloseRawScreenShotReadStream();
                 }
